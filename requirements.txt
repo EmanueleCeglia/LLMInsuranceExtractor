@@ -1,0 +1,6 @@
+transformers
+accelerate
+pdfplumber
+camelot-py[cv]
+sentence_transformers
+bitsandbytes
