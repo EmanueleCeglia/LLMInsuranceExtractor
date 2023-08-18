@@ -1,6 +1,8 @@
 transformers
 accelerate
 pdfplumber
-camelot-py[cv]
+camelot-py[base]
+PyPDF2==2.12.1
 sentence_transformers
 bitsandbytes
+ghostscript
