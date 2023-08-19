@@ -5,7 +5,7 @@ from camelot import read_pdf
 from sentence_transformers import SentenceTransformer, util
 import torch
 
-class PDFDatesFinder:
+class PDFDatesFinderSemanticSearch:
     def __init__(self, pdf_path):
         self.pdf_path = pdf_path
         self.pages_words = None
@@ -159,3 +159,61 @@ class PDFDatesFinder:
         dict_dates = self.__semantic_search(top_k, parag_embeddings, dates_kw)
         dict_dates = self.__remove_strings_without_years(dict_dates)
         return dict_dates
+
+
+
+class PDFDatesFinderSpace:
+    def __init__(self, path):
+        self.path = path
+
+    def find_pages_tables(self, len_doc):
+        """Check for tables on each page of the pdf.
+        In order to exclude these pages from extraction with fitz library.
+        """
+        index_pages = []
+        for i in range(len_doc):
+            table = read_pdf(self.path, pages=str(i))
+            if table.n > 0:
+                index_pages.append(i - 1)
+        return index_pages
+
+    def extract_mytext(self):
+        """Extracts tables in pdf file.
+        Extracts text present on pages excluding those with tables.
+        """
+        tables = read_pdf(self.path, pages='all')
+        with pdfplumber.open(self.path) as pdf:
+            len_doc = len(pdf.pages)
+            index_tables = self.find_pages_tables(len_doc)
+            pages = []
+            len_doc = int(len_doc*0.5)
+            for i in range(len_doc):
+                if i not in index_tables:
+                    pages.append(pdf.pages[i].extract_text(layout=True))
+        return pages, tables
+
+    def identify_paragraphs_space(self, page, left_range=40, right_range=40):
+        lines = page.split("\n")
+        paragraphs = []
+        current_paragraph = ""
+        for line in lines:
+            line_without_spaces = line.strip()
+            if line_without_spaces == "":
+                dates = re.findall(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)
+                # Check if the current paragraph contains at least two dates
+                if current_paragraph != "" and len(dates) >= 2:
+                    positions = [match.start() for match in re.finditer(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)]
+                    start_pos = max(positions[0] - left_range, 0)
+                    end_pos = min(positions[1] + right_range, len(current_paragraph))
+                    current_paragraph = current_paragraph[start_pos:end_pos]
+                    paragraphs.append(re.sub(' +', ' ', current_paragraph.strip()))
+                current_paragraph = ""
+            else:
+                current_paragraph += line + " "
+        if current_paragraph != "" and len(re.findall(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)) >= 2:
+            positions = [match.start() for match in re.finditer(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)]
+            start_pos = max(positions[0] - left_range, 0)
+            end_pos = min(positions[1] + right_range, len(current_paragraph))
+            current_paragraph = current_paragraph[start_pos:end_pos]
+            paragraphs.append(re.sub(' +', ' ', current_paragraph.strip()))
+        return paragraphs
