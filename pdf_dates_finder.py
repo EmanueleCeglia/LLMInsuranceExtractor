@@ -192,7 +192,7 @@ class PDFDatesFinderSpace:
                     pages.append(pdf.pages[i].extract_text(layout=True))
         return pages, tables
 
-    def identify_paragraphs_space(self, page, left_range=40, right_range=40):
+    def identify_paragraphs_space(self, page, left_range=60, right_range=50):
         lines = page.split("\n")
         paragraphs = []
         current_paragraph = ""
