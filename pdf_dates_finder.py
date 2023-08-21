@@ -192,7 +192,7 @@ class PDFDatesFinderSpace:
                     pages.append(pdf.pages[i].extract_text(layout=True))
         return pages, tables
 
-    def identify_paragraphs_space(self, page, left_range=60, right_range=50):
+    def identify_paragraphs_space(self, page, left_range=60, right_range=40):
         lines = page.split("\n")
         paragraphs = []
         current_paragraph = ""
@@ -202,6 +202,15 @@ class PDFDatesFinderSpace:
                 dates = re.findall(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)
                 # Check if the current paragraph contains at least two dates
                 if current_paragraph != "" and len(dates) >= 2:
+
+                    # CONTROLLO PRESENZA PAROLA PERIOD E PRENDERE LATO DX
+                    match = re.search(r'\bperiod\b', current_paragraph, re.IGNORECASE)
+                    if match:
+                        #print(current_paragraph)
+                        current_paragraph = current_paragraph[match.start():]
+                    # FINE CONTROLLO
+
+
                     positions = [match.start() for match in re.finditer(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)]
                     start_pos = max(positions[0] - left_range, 0)
                     end_pos = min(positions[1] + right_range, len(current_paragraph))
@@ -210,10 +219,12 @@ class PDFDatesFinderSpace:
                 current_paragraph = ""
             else:
                 current_paragraph += line + " "
+        
         if current_paragraph != "" and len(re.findall(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)) >= 2:
             positions = [match.start() for match in re.finditer(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)]
             start_pos = max(positions[0] - left_range, 0)
             end_pos = min(positions[1] + right_range, len(current_paragraph))
             current_paragraph = current_paragraph[start_pos:end_pos]
             paragraphs.append(re.sub(' +', ' ', current_paragraph.strip()))
+        
         return paragraphs
