@@ -203,17 +203,16 @@ class PDFDatesFinderSpace:
                 # Check if the current paragraph contains at least two dates
                 if current_paragraph != "" and len(dates) >= 2:
 
-                    # CONTROLLO PRESENZA PAROLA PERIOD E PRENDERE LATO DX
+                    # If kw period is found we take it plus the rest of phrase ignoring all the part before 
                     match = re.search(r'\bperiod\b', current_paragraph, re.IGNORECASE)
                     if match:
-                        #print(current_paragraph)
-                        current_paragraph = current_paragraph[match.start():]
-                    # FINE CONTROLLO
-
-
-                    positions = [match.start() for match in re.finditer(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)]
-                    start_pos = max(positions[0] - left_range, 0)
-                    end_pos = min(positions[1] + right_range, len(current_paragraph))
+                        start_pos = 0
+                        end_pos = len(current_paragraph)
+                    # Otherwise we use the right and left range
+                    else:
+                        positions = [match.start() for match in re.finditer(r'\b\d{4}\b|\b[5-9][0-9]\b', current_paragraph)]
+                        start_pos = max(positions[0] - left_range, 0)
+                        end_pos = min(positions[1] + right_range, len(current_paragraph))
                     current_paragraph = current_paragraph[start_pos:end_pos]
                     paragraphs.append(re.sub(' +', ' ', current_paragraph.strip()))
                 current_paragraph = ""
