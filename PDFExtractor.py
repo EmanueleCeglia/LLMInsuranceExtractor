@@ -10,7 +10,7 @@ import openai
 import cv2
 
 # OpenAI model settings
-API_KEY = "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"
+API_KEY = "######"
 openai.api_key = API_KEY
 model_id = 'gpt-3.5-turbo'
 
@@ -25,7 +25,7 @@ def ChatGPT_conversation(conversation):
 
 
 # Insurances folder path
-insurances_folder_path = "/mnt/c/Users/e.ceglia/Desktop/EMA/Tesi/Eng Insurances"
+insurances_folder_path = "######"
 
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -131,7 +131,7 @@ def Merge(dict_1, dict_2):
 
 final_dict = Merge(extracted_dates, extracted_deductibles)
 
-output_path = "/mnt/c/Users/e.ceglia/Desktop/extractions.json"
+output_path = "######"
 
 # Scrive il dizionario in un file JSON
 with open(output_path, 'w') as file:
