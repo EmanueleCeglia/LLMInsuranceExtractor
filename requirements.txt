@@ -8,3 +8,4 @@ bitsandbytes
 ghostscript
 python-Levenshtein
 openai
+opencv-python
