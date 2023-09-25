@@ -10,7 +10,7 @@ import openai
 import cv2
 
 # OpenAI model settings
-API_KEY = "######"
+API_KEY = "#######"
 openai.api_key = API_KEY
 model_id = 'gpt-3.5-turbo'
 
@@ -25,9 +25,15 @@ def ChatGPT_conversation(conversation):
 
 
 # Insurances folder path
-insurances_folder_path = "######"
+insurances_folder_path = "./Insurances"
+output_dictionary = {}
 
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Inizialize output dictionary
+for root, dirs, files in os.walk(insurances_folder_path):
+    for file_name in tqdm(files):
+       output_dictionary[file_name] = {}
+
 
 # DATES EXTRACTION using GPT-3.5 turbo
 extracted_dates = {}
@@ -86,7 +92,7 @@ for root, dirs, files in os.walk(insurances_folder_path):
 
         if responses:
           print(f'DATE {file_name} EXTRACTED!')
-          extracted_dates[str(file_name)+"_dates"] = responses
+          output_dictionary[file_name]['Insurance Period'] = response
         else:
           print(f'DATE {file_name} NOT FOUND!')
 
@@ -112,29 +118,23 @@ for root, dirs, files in os.walk(insurances_folder_path):
         prompt = 'User:' + " Extract only information about DEDUCTIBLES from the following text: " + deductibles[file_name]
         conversation.append({'role': 'user', 'content': prompt})
         conversation = ChatGPT_conversation(conversation)
-        extracted_deductibles[file_name + "_deductibles"] = [{'Deductible': conversation[-1]['content'].strip()}]
 
-        if len(extracted_deductibles[file_name + "_deductibles"]):
+        if len([{'Deductible': conversation[-1]['content'].strip()}]):
            print(f'DEDUCTIBLES {file_name} EXTRACTED')
+           output_dictionary[file_name]['Deductibles'] = conversation[-1]['content'].strip()
         else:
            print(f'DEDUCTIBLES {file_name} NOT FOUND!')
-
-
+        
+  
 
 ## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Save output as .json file
 
-def Merge(dict_1, dict_2):
-	result = dict_1 | dict_2
-	return result
-
-final_dict = Merge(extracted_dates, extracted_deductibles)
-
 output_path = "######"
 
 # Scrive il dizionario in un file JSON
 with open(output_path, 'w') as file:
-    json.dump(final_dict, file)
+    json.dump(output_dictionary, file)
 
 print("File JSON salvato con successo!")
