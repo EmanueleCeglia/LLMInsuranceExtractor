@@ -344,9 +344,11 @@ class PDFSublimitsFinder:
             for i in range(len(words[num_page])-1):
                 word = words[num_page][i]
                 next_word = words[num_page][i+1]
-                if ('Bold' or 'bold') in word:
+                if ('Bold' or 'bold') in word['font']:
+                    single_word = word['text'].lower()
+                    couple_word = word['text'].lower() + " " + next_word['text'].lower()
                     for single_kw in sublimits_single_kw:
-                        if single_kw in word:
+                        if single_kw in single_word.replace(':',''):
                             index_sub.append(num_page)
                             index_sub_bold.append(index_bold)
                             index_bold +=1 
@@ -357,7 +359,7 @@ class PDFSublimitsFinder:
                             sublimit_kw_found.append(single_kw)
                     
                     for multiple_kw in sublimits_multiple_kw:
-                        if multiple_kw in word + " " + next_word:
+                        if multiple_kw in couple_word.replace(':',''):
                             index_sub.append(num_page)
                             index_sub_bold.append(index_bold)
                             index_bold +=1 

@@ -32,7 +32,7 @@ output_dictionary = {}
 ## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Inizialize output dictionary
 for root, dirs, files in os.walk(insurances_folder_path):
-    for file_name in tqdm(files):
+    for file_name in files:
        output_dictionary[file_name] = {}
 
 
@@ -127,7 +127,6 @@ for root, dirs, files in os.walk(insurances_folder_path):
            print(f'DEDUCTIBLES {file_name} NOT FOUND!')
 
 
-
 ## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # SUBLIMITS EXTRACTION using GPT-3.5 turbo
@@ -164,7 +163,7 @@ for root, dirs, files in os.walk(insurances_folder_path):
 
 # Save output as .json file
 
-output_path = "######"
+output_path = "#####"
 
 # Scrive il dizionario in un file JSON
 with open(output_path, 'w') as file:
