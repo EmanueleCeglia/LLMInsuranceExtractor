@@ -1,5 +1,6 @@
 from pdf_extractor import PDFDatesFinderSpace   
 from pdf_extractor import PDFDeductiblesFinder
+from pdf_extractor import PDFSublimitsFinder
 from postprocessing_functions import post_process_response_dates
 from postprocessing_functions import find_dates_regex
 import os
@@ -124,6 +125,38 @@ for root, dirs, files in os.walk(insurances_folder_path):
            output_dictionary[file_name]['Deductibles'] = conversation[-1]['content'].strip()
         else:
            print(f'DEDUCTIBLES {file_name} NOT FOUND!')
+
+
+
+## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# SUBLIMITS EXTRACTION using GPT-3.5 turbo
+
+sublimits = {}
+extracted_sublimits = {}
+
+print('Extracting Sublimits...')
+for root, dirs, files in os.walk(insurances_folder_path):
+    for file_name in tqdm(files):
+        conversation = []
+        full_file_path = os.path.join(root, file_name)
+
+        extractor_sublimits = PDFSublimitsFinder(full_file_path)
+        pages, pages_words, tables = extractor_sublimits.extract_mytext()
+        pages_with_sub, sublimit_kw_found = extractor_sublimits.identify_sublimits_pages(pages, pages_words)
+        sublimits[file_name] = pages_with_sub
+
+        if len(sublimit_kw_found):
+          prompt = 'User:' + f" Extract only information about {sublimit_kw_found[0]} from the following text: " + sublimits[file_name]
+          conversation.append({'role': 'user', 'content': prompt})
+          conversation = ChatGPT_conversation(conversation)
+
+          if len([{'Sublimits': conversation[-1]['content'].strip()}]):
+            print(f'SUBLIMITS {file_name} EXTRACTED')
+            output_dictionary[file_name]['Sublimits'] = conversation[-1]['content'].strip()
+        
+        else:
+           print(f'SUBLIMITS {file_name} NOT FOUND!')
         
   
 
