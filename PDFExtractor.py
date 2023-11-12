@@ -1,172 +1,154 @@
-from pdf_extractor import PDFDatesFinderSpace   
+from pathlib import Path
+import openai
+from pdf_extractor import PDFDatesFinder
 from pdf_extractor import PDFDeductiblesFinder
-from pdf_extractor import PDFSublimitsFinder
-from postprocessing_functions import post_process_response_dates
-from postprocessing_functions import find_dates_regex
-import os
-import re
+from postprocessing_functions import postprocess_and_clean_dates
 from tqdm import tqdm
 import json
-import openai
-import cv2
+
 
 # OpenAI model settings
-API_KEY = "#######"
+API_KEY = Path("credentials/openai_api_key.txt").read_text().strip()
 openai.api_key = API_KEY
-model_id = 'gpt-3.5-turbo'
+model_id4 = 'gpt-4-1106-preview'
 
-# ChatGPT 
-def ChatGPT_conversation(conversation):
+
+
+# ChatGPT-4
+def ChatGPT4_conversation(conversation):
     response = openai.ChatCompletion.create(
-        model=model_id,
+        model=model_id4,
         messages=conversation
     )
-    conversation.append({'role': response.choices[0].message.role, 'content': response.choices[0].message.content})
+    conversation.append({'role': response.choices[0].message.role, 
+                         'content': response.choices[0].message.content})
     return conversation
 
 
+
+
+def compose_prompt_date(
+    text: str,
+) -> str:
+    prompt = f"""\
+You are tasked with finding start date and end date in the text.
+
+Notice that the difference between the start date and end date USUALLY is a multiple of 6 months.
+
+If dates ARE found, output in the following format:
+```
+Start date: YYYY-MM-DD
+End date: YYYY-MM-DD
+```
+If dates ARE NOT found, output the following:
+```
+Start date: N/A
+End date: N/A
+```
+
+Output start date and end date from the following text:
+
+```
+{text}
+```\
+"""
+
+    return prompt
+
+
+def compose_prompt_deductibles(
+    text: str,
+) -> str:
+    prompt = f"""\
+You are tasked with finding all the mentioned deductibles in the text.
+
+Notice that the text MAY NOT contain deductibles.
+
+Your output MUST be a list of deductibles, each in the following format:
+```
+<deductible name>: <deductible value>
+```
+
+If NO deductibles are mentioned, output the following:
+```
+Not found
+```
+
+Output deductibles from the following text:
+
+```
+{text}
+```\
+"""
+
+    return prompt
+
+
 # Insurances folder path
-insurances_folder_path = "./Insurances"
+insurances_folder_path = Path('insurances')
 output_dictionary = {}
 
-## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# Inizialize output dictionary
-for root, dirs, files in os.walk(insurances_folder_path):
-    for file_name in files:
-       output_dictionary[file_name] = {}
+# Iterate over all files in the insurances folder
+for file_path in insurances_folder_path.iterdir():
+    
+    if file_path.is_file():
+        
+        # Identification dates
+        extractor_dates = PDFDatesFinder(file_path, API_KEY)
+        pages = extractor_dates.extract_text()
+        text_pages_dates, index_pages_dates = extractor_dates.identify_period_pages(pages)
 
+        # Dates extraction using GPT
+        output_dates = []
 
-# DATES EXTRACTION using GPT-3.5 turbo
-extracted_dates = {}
-
-print('Extracting Dates...')
-for root, dirs, files in os.walk(insurances_folder_path):
-    for file_name in tqdm(files):
-
-        full_file_path = os.path.join(root, file_name)
-
-        # Dates extraction
-        extractor_dates = PDFDatesFinderSpace(full_file_path)
-        pages, tables = extractor_dates.extract_mytext()
-        paragraphs = [extractor_dates.identify_paragraphs_space(page) for page in pages]
-
-        # keywords filter 1th level
-        check_kw = False
-        for phrase in paragraphs:
-          for sentence in phrase:
-            if re.search(r'\bperiod\b', sentence, re.IGNORECASE):
-              check_kw = True
-
-        if check_kw:
-          # Use a list comprehension with regex to keep only the phrases that contain the word "period" (case-insensitive)
-          paragraphs = [sublist for sublist in paragraphs if any(re.search(r'\bperiod\b', phrase, re.IGNORECASE) for phrase in sublist)]
-
-          # Now, further filter each sublist to keep only the phrases that contain the word "period"
-          paragraphs = [[phrase for phrase in sublist if re.search(r'\bperiod\b', phrase, re.IGNORECASE)] for sublist in paragraphs]
-
-
-        responses = []
-        for phrase in paragraphs:
-          if len(phrase):
-            for sentence in phrase:
+        for page in text_pages_dates:
+                
                 conversation = []
-                sentcence = sentence.replace(',', '')
-                prompt = "Find start date and end date from the following sentence: " + sentence
+
+                prompt = compose_prompt_date(
+                    text=page,
+                )
                 conversation.append({'role': 'user', 'content': prompt})
-                conversation = ChatGPT_conversation(conversation)
-                response = post_process_response_dates(conversation[-1]['content'].strip())
+                conversation = ChatGPT4_conversation(conversation)
 
-            if response:
-                responses.append(response)
-                #print(response)
+                response = conversation[-1]['content'].strip()
 
-        if len(responses)==0:
-          # Parse with regex for prompt fails
-          for phrase in paragraphs:
-            if len(phrase):
-              if len(phrase)>1:
-                phrase = [' '.join(phrase)]
-              for sentence in phrase:
-                  sentence = sentence.replace(',','')
-                  response = find_dates_regex(sentence)
-                  responses.append(response)
+                if response:
+                    output_dates.append(response)
 
-        if responses:
-          print(f'DATE {file_name} EXTRACTED!')
-          output_dictionary[file_name]['Insurance Period'] = response
-        else:
-          print(f'DATE {file_name} NOT FOUND!')
-
-
-## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# DEDUCTIBLES EXTRACTION using GPT-3.5 turbo
-
-deductibles = {}
-extracted_deductibles = {}
-
-print('Extracting Deductibles...')
-for root, dirs, files in os.walk(insurances_folder_path):
-    for file_name in tqdm(files):
-        conversation = []
-        full_file_path = os.path.join(root, file_name)
-
-        extractor_deductibles = PDFDeductiblesFinder(full_file_path)
-        pages, pages_words, tables = extractor_deductibles.extract_mytext()
-        pages_with_ded = extractor_deductibles.identify_deductibles_pages(pages, pages_words)
-        deductibles[file_name] = pages_with_ded
-
-        prompt = 'User:' + " Extract only information about DEDUCTIBLES from the following text: " + deductibles[file_name]
-        conversation.append({'role': 'user', 'content': prompt})
-        conversation = ChatGPT_conversation(conversation)
-
-        if len([{'Deductible': conversation[-1]['content'].strip()}]):
-           print(f'DEDUCTIBLES {file_name} EXTRACTED')
-           output_dictionary[file_name]['Deductibles'] = conversation[-1]['content'].strip()
-        else:
-           print(f'DEDUCTIBLES {file_name} NOT FOUND!')
-
-
-## -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# SUBLIMITS EXTRACTION using GPT-3.5 turbo
-
-sublimits = {}
-extracted_sublimits = {}
-
-print('Extracting Sublimits...')
-for root, dirs, files in os.walk(insurances_folder_path):
-    for file_name in tqdm(files):
-        conversation = []
-        full_file_path = os.path.join(root, file_name)
-
-        extractor_sublimits = PDFSublimitsFinder(full_file_path)
-        pages, pages_words, tables = extractor_sublimits.extract_mytext()
-        pages_with_sub, sublimit_kw_found = extractor_sublimits.identify_sublimits_pages(pages, pages_words)
-        sublimits[file_name] = pages_with_sub
-
-        if len(sublimit_kw_found):
-          prompt = 'User:' + f" Extract only information about {sublimit_kw_found[0]} from the following text: " + sublimits[file_name]
-          conversation.append({'role': 'user', 'content': prompt})
-          conversation = ChatGPT_conversation(conversation)
-
-          if len([{'Sublimits': conversation[-1]['content'].strip()}]):
-            print(f'SUBLIMITS {file_name} EXTRACTED')
-            output_dictionary[file_name]['Sublimits'] = conversation[-1]['content'].strip()
+        # Postprocessing dates
+        output_dates = postprocess_and_clean_dates(output_dates)
         
-        else:
-           print(f'SUBLIMITS {file_name} NOT FOUND!')
         
-  
+        # Identification deductibles
+        extractor_deductibles = PDFDeductiblesFinder(file_path, API_KEY)
+        pages = extractor_deductibles.extract_text()
+        text_pages_deductibles, index_pages_deductibles = extractor_deductibles.identify_deductibles_pages(pages)
 
-## --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        # Deductibles extraction using GPT
+        output_deductibles = []
 
-# Save output as .json file
+        for page in text_pages_deductibles:
+                
+                conversation = []
 
-output_path = "#####"
+                prompt = compose_prompt_deductibles(
+                    text=page,
+                )
+                conversation.append({'role': 'user', 'content': prompt})
+                conversation = ChatGPT4_conversation(conversation)
 
-# Scrive il dizionario in un file JSON
-with open(output_path, 'w') as file:
-    json.dump(output_dictionary, file)
+                response = conversation[-1]['content'].strip()
 
-print("File JSON salvato con successo!")
+                if response:
+                    output_deductibles.append(response)
+
+    output_dictionary[file_path.stem] = {'insurance period': output_dates, 'deductibles': output_deductibles}
+
+# Save output dictionary as json file
+with open('output.json', 'w') as fp:
+    json.dump(output_dictionary, fp)
+
+        
+
+

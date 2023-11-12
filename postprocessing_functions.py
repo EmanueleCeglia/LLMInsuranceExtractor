@@ -1,30 +1,36 @@
 import re
+from datetime import datetime
 
-# Post processing function for DATES
+def postprocess_and_clean_dates(list_items):
+    """
+    Processes a list of strings, filtering out items that contain both a start date and an end date in YYYY-MM-DD format.
+    Verifies that the start date is chronologically before the end date and that they are not the same.
+    Cleans the strings by removing extraneous text and reducing duplicates.
 
-def post_process_response_dates(text):
-    start_date_pattern = r"Start date:\s*([0-9]+[a-z]*\s+[A-Z][a-z]+\s+[0-9]{4})"
-    end_date_pattern = r"End date:\s*([0-9]+[a-z]*\s+[A-Z][a-z]+\s+[0-9]{4})"
+    :param list_items: List of string items to process.
+    :return: List of processed and cleaned items.
+    """
+    pattern = r'Start date: (\d{4}-\d{2}-\d{2})\nEnd date: (\d{4}-\d{2}-\d{2})'
+    processed_items = set()
 
-    start_date_match = re.search(start_date_pattern, text)
-    end_date_match = re.search(end_date_pattern, text)
+    for item in list_items:
+        # Check if the item matches the pattern
+        match = re.search(pattern, item)
+        if match:
+            start_date_str, end_date_str = match.groups()
 
-    result = {}
-    if start_date_match and end_date_match:
-        result['Start date'] = start_date_match.group(1)
-        result['End date'] = end_date_match.group(1)
-    else:
-        return None
+            try:
+                # Convert strings to datetime objects
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
 
-    return result
+                # Verify that the start date is before the end date and they are not the same
+                if start_date < end_date:
+                    # Extract the relevant portion of the string
+                    cleaned_item = re.search(r'Start date: \d{4}-\d{2}-\d{2}\nEnd date: \d{4}-\d{2}-\d{2}', item).group(0)
+                    processed_items.add(cleaned_item)
+            except ValueError:
+                # Ignore strings with invalid dates
+                continue
 
-# second level filter with regex if gpt-3.5 cannot find dates
-def find_dates_regex(string):
-    pattern = r'\b\d{1,2}/\d{1,2}/\d{4}\b|\b\d{1,2} [A-Za-z]+ \d{4}\b|\b\d{1,2}(?:st|nd|rd|th)? [A-Za-z]+ \d{4}\b|\b[A-Za-z]+ \d{1,2}(?:st|nd|rd|th)? \d{4}\b'
-    dates = re.findall(pattern, string)
-    if len(dates) >= 2:
-        return f"Start date: {dates[0]} End date: {dates[1]}"
-    elif len(dates) == 1:
-        return f"Start date: {dates[0]} End date: None"
-    else:
-        return "No dates found"
+    return list(processed_items)

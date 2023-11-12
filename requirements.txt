@@ -9,3 +9,4 @@ ghostscript
 python-Levenshtein
 openai
 opencv-python
+Path
